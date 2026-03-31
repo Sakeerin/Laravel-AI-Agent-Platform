@@ -42,6 +42,16 @@ class Conversation extends Model
         return $this->hasMany(Message::class)->latest()->limit(1);
     }
 
+    public function toolCalls(): HasMany
+    {
+        return $this->hasMany(ToolCall::class);
+    }
+
+    public function taskLogs(): HasMany
+    {
+        return $this->hasMany(TaskLog::class);
+    }
+
     public function touchActivity(): void
     {
         $this->update(['last_activity_at' => now()]);

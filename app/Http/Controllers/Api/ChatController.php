@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
-use App\Models\Message;
-use App\Services\AI\AIManager;
+use App\Services\AI\AgentOrchestrator;
+use App\Services\Tools\ToolContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ChatController extends Controller
 {
     public function __construct(
-        private readonly AIManager $ai,
+        private readonly AgentOrchestrator $orchestrator,
     ) {}
 
     public function send(Request $request): JsonResponse|StreamedResponse
@@ -31,7 +31,7 @@ class ChatController extends Controller
         $conversation = $this->resolveConversation($user, $validated);
         $model = $validated['model'] ?? $conversation->model;
 
-        $userMessage = $conversation->messages()->create([
+        $conversation->messages()->create([
             'role' => 'user',
             'content' => $validated['message'],
         ]);
@@ -42,11 +42,13 @@ class ChatController extends Controller
 
         $conversation->touchActivity();
 
+        $context = new ToolContext($user, $conversation);
+
         if ($shouldStream) {
-            return $this->streamResponse($conversation, $model);
+            return $this->streamResponse($conversation, $model, $context);
         }
 
-        return $this->syncResponse($conversation, $model);
+        return $this->syncResponse($conversation, $model, $context);
     }
 
     public function stream(Request $request, Conversation $conversation): StreamedResponse
@@ -54,8 +56,9 @@ class ChatController extends Controller
         abort_if($conversation->user_id !== $request->user()->id, 403);
 
         $model = $request->query('model', $conversation->model);
+        $context = new ToolContext($request->user(), $conversation);
 
-        return $this->streamResponse($conversation, $model);
+        return $this->streamResponse($conversation, $model, $context);
     }
 
     private function resolveConversation($user, array $validated): Conversation
@@ -73,71 +76,69 @@ class ChatController extends Controller
         ]);
     }
 
-    private function buildChatHistory(Conversation $conversation): array
+    private function syncResponse(Conversation $conversation, string $model, ToolContext $context): JsonResponse
     {
-        $messages = $conversation->messages()
-            ->orderBy('created_at')
-            ->get()
-            ->map(fn(Message $m) => [
-                'role' => $m->role,
-                'content' => $m->content,
-            ])
-            ->toArray();
-
-        array_unshift($messages, [
-            'role' => 'system',
-            'content' => 'You are a helpful AI assistant. Be concise and accurate in your responses.',
-        ]);
-
-        return $messages;
-    }
-
-    private function syncResponse(Conversation $conversation, string $model): JsonResponse
-    {
-        $history = $this->buildChatHistory($conversation);
-        $result = $this->ai->chat($history, $model);
+        $result = $this->orchestrator->chat($conversation, $model, $context);
 
         $assistantMessage = $conversation->messages()->create([
             'role' => 'assistant',
             'content' => $result['content'],
-            'model' => $result['model'],
+            'model' => $result['model'] ?? $model,
             'input_tokens' => $result['input_tokens'],
             'output_tokens' => $result['output_tokens'],
+            'metadata' => !empty($result['tool_calls']) ? ['tool_calls' => $result['tool_calls']] : null,
         ]);
 
         return response()->json([
             'message' => $assistantMessage,
             'conversation_id' => $conversation->id,
+            'tool_calls' => $result['tool_calls'] ?? [],
         ]);
     }
 
-    private function streamResponse(Conversation $conversation, string $model): StreamedResponse
+    private function streamResponse(Conversation $conversation, string $model, ToolContext $context): StreamedResponse
     {
-        $history = $this->buildChatHistory($conversation);
-
-        return response()->stream(function () use ($conversation, $history, $model) {
+        return response()->stream(function () use ($conversation, $model, $context) {
             $fullContent = '';
             $inputTokens = 0;
             $outputTokens = 0;
+            $toolCalls = [];
 
             try {
-                foreach ($this->ai->stream($history, $model) as $chunk) {
-                    if ($chunk['type'] === 'text') {
+                foreach ($this->orchestrator->stream($conversation, $model, $context) as $chunk) {
+                    $type = $chunk['type'];
+
+                    if ($type === 'text') {
                         $fullContent .= $chunk['content'];
-                        echo "data: " . json_encode([
+                        $this->sendEvent([
                             'type' => 'text',
                             'content' => $chunk['content'],
                             'conversation_id' => $conversation->id,
-                        ]) . "\n\n";
-                    } elseif ($chunk['type'] === 'done') {
+                        ]);
+                    } elseif ($type === 'tool_start') {
+                        $this->sendEvent([
+                            'type' => 'tool_start',
+                            'tool_call_id' => $chunk['tool_call_id'],
+                            'tool_name' => $chunk['tool_name'],
+                            'arguments' => $chunk['arguments'],
+                            'conversation_id' => $conversation->id,
+                        ]);
+                    } elseif ($type === 'tool_result') {
+                        $toolCalls[] = $chunk;
+                        $this->sendEvent([
+                            'type' => 'tool_result',
+                            'tool_call_id' => $chunk['tool_call_id'],
+                            'tool_name' => $chunk['tool_name'],
+                            'result' => $chunk['result'],
+                            'success' => $chunk['success'],
+                            'duration_ms' => $chunk['duration_ms'],
+                            'conversation_id' => $conversation->id,
+                        ]);
+                    } elseif ($type === 'done') {
+                        $fullContent = $chunk['full_content'] ?? $fullContent;
                         $inputTokens = $chunk['input_tokens'] ?? 0;
                         $outputTokens = $chunk['output_tokens'] ?? 0;
                     }
-
-                    if (ob_get_level() > 0) {
-                        ob_flush();
-                    }
-                    flush();
                 }
 
                 $assistantMessage = $conversation->messages()->create([
@@ -146,21 +147,23 @@ class ChatController extends Controller
                     'model' => $model,
                     'input_tokens' => $inputTokens,
                     'output_tokens' => $outputTokens,
+                    'metadata' => !empty($toolCalls) ? ['tool_calls' => $toolCalls] : null,
                 ]);
 
-                echo "data: " . json_encode([
+                $this->sendEvent([
                     'type' => 'done',
                     'message_id' => $assistantMessage->id,
                     'conversation_id' => $conversation->id,
                     'input_tokens' => $inputTokens,
                     'output_tokens' => $outputTokens,
-                ]) . "\n\n";
+                    'tool_calls_count' => count($toolCalls),
+                ]);
 
             } catch (\Exception $e) {
-                echo "data: " . json_encode([
+                $this->sendEvent([
                     'type' => 'error',
                     'content' => 'An error occurred: ' . $e->getMessage(),
-                ]) . "\n\n";
+                ]);
             }
 
             if (ob_get_level() > 0) {
@@ -173,5 +176,14 @@ class ChatController extends Controller
             'Connection' => 'keep-alive',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    private function sendEvent(array $data): void
+    {
+        echo "data: " . json_encode($data) . "\n\n";
+        if (ob_get_level() > 0) {
+            ob_flush();
+        }
+        flush();
     }
 }

@@ -39,4 +39,13 @@ return [
         'default_model' => env('AI_DEFAULT_MODEL', 'claude-sonnet'),
     ],
 
+    'brave' => [
+        'api_key' => env('BRAVE_API_KEY'),
+    ],
+
+    'google' => [
+        'search_api_key' => env('GOOGLE_SEARCH_API_KEY'),
+        'search_cx' => env('GOOGLE_SEARCH_CX'),
+    ],
+
 ];

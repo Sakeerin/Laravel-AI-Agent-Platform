@@ -25,7 +25,9 @@
             </svg>
           </div>
           <h3 class="text-xl font-semibold text-white mb-2">How can I help you today?</h3>
-          <p class="text-dark-400 max-w-md">Send a message to start a conversation. I can help with coding, analysis, writing, and more.</p>
+          <p class="text-dark-400 max-w-md">
+            I can search the web, browse websites, read/write files, run commands, and more.
+          </p>
 
           <!-- Quick prompts -->
           <div class="grid grid-cols-2 gap-3 mt-8 max-w-lg">
@@ -42,12 +44,22 @@
 
         <!-- Message list -->
         <template v-for="message in chat.messages" :key="message.id">
-          <MessageBubble :message="message" />
+          <ToolCallDisplay v-if="message.role === 'tool'" :message="message" />
+          <MessageBubble v-else :message="message" />
+        </template>
+
+        <!-- Active tool calls (running) -->
+        <template v-if="chat.isStreaming">
+          <ActiveToolCall
+            v-for="tc in runningToolCalls"
+            :key="tc.id"
+            :toolCall="tc"
+          />
         </template>
 
         <!-- Streaming response -->
         <StreamingMessage
-          v-if="chat.isStreaming"
+          v-if="chat.isStreaming && (chat.streamingContent || chat.activeToolCalls.length === 0)"
           :content="chat.streamingContent"
         />
       </div>
@@ -59,22 +71,28 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted } from 'vue';
 import { useChatStore } from '../stores/chat';
 import Sidebar from '../components/Sidebar.vue';
 import MessageBubble from '../components/MessageBubble.vue';
 import StreamingMessage from '../components/StreamingMessage.vue';
 import ChatInput from '../components/ChatInput.vue';
+import ToolCallDisplay from '../components/ToolCallDisplay.vue';
+import ActiveToolCall from '../components/ActiveToolCall.vue';
 
 const chat = useChatStore();
 const messagesContainer = ref(null);
 
 const quickPrompts = [
-    'Explain how AI agents work',
-    'Write a Python script to scrape a website',
-    'Help me debug my Laravel code',
-    'Create a business plan outline',
+    'Search the web for latest AI news',
+    'What is the current date and time?',
+    'Write a Python script and save it to a file',
+    'Calculate the compound interest on $10,000 at 5% for 10 years',
 ];
+
+const runningToolCalls = computed(() =>
+    chat.activeToolCalls.filter(tc => tc.status === 'running')
+);
 
 function scrollToBottom() {
     nextTick(() => {
@@ -87,6 +105,7 @@ function scrollToBottom() {
 
 watch(() => chat.messages.length, scrollToBottom);
 watch(() => chat.streamingContent, scrollToBottom);
+watch(() => chat.activeToolCalls.length, scrollToBottom);
 
 onMounted(() => {
     chat.fetchConversations();

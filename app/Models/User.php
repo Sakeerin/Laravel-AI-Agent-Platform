@@ -58,4 +58,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(ApiKey::class);
     }
+
+    public function taskLogs(): HasMany
+    {
+        return $this->hasMany(TaskLog::class);
+    }
 }
