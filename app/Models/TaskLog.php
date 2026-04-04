@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\TaskStatusUpdated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -46,6 +47,7 @@ class TaskLog extends Model
     public function markRunning(): void
     {
         $this->update(['status' => 'running', 'started_at' => now()]);
+        $this->broadcastStatus();
     }
 
     public function markCompleted(array $result = []): void
@@ -56,6 +58,7 @@ class TaskLog extends Model
             'progress' => 100,
             'completed_at' => now(),
         ]);
+        $this->broadcastStatus();
     }
 
     public function markFailed(string $error): void
@@ -65,10 +68,21 @@ class TaskLog extends Model
             'error' => $error,
             'completed_at' => now(),
         ]);
+        $this->broadcastStatus();
     }
 
     public function updateProgress(int $progress): void
     {
         $this->update(['progress' => min(100, $progress)]);
+        $this->broadcastStatus();
+    }
+
+    private function broadcastStatus(): void
+    {
+        try {
+            TaskStatusUpdated::dispatch($this);
+        } catch (\Throwable $e) {
+            // Broadcasting is optional; don't fail the operation if unavailable
+        }
     }
 }

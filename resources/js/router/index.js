@@ -20,6 +20,18 @@ const routes = [
         component: () => import('../views/Chat.vue'),
         meta: { auth: true },
     },
+    {
+        path: '/skills',
+        name: 'skills',
+        component: () => import('../views/Skills.vue'),
+        meta: { auth: true },
+    },
+    {
+        path: '/tasks',
+        name: 'tasks',
+        component: () => import('../views/Tasks.vue'),
+        meta: { auth: true },
+    },
 ];
 
 const router = createRouter({

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\ToolCallStatusUpdated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -40,6 +41,7 @@ class ToolCall extends Model
     public function markRunning(): void
     {
         $this->update(['status' => 'running']);
+        $this->broadcastStatus();
     }
 
     public function markCompleted(string $result, int $durationMs): void
@@ -49,6 +51,7 @@ class ToolCall extends Model
             'result' => $result,
             'duration_ms' => $durationMs,
         ]);
+        $this->broadcastStatus();
     }
 
     public function markFailed(string $error, int $durationMs): void
@@ -58,5 +61,18 @@ class ToolCall extends Model
             'error' => $error,
             'duration_ms' => $durationMs,
         ]);
+        $this->broadcastStatus();
+    }
+
+    private function broadcastStatus(): void
+    {
+        try {
+            $userId = $this->conversation?->user_id;
+            if ($userId) {
+                ToolCallStatusUpdated::dispatch($this, $userId);
+            }
+        } catch (\Throwable $e) {
+            // Broadcasting is optional
+        }
     }
 }
