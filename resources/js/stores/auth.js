@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import api from '../api/client';
+import { bootRealtime, stopRealtime } from '../realtime';
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref(null);
@@ -9,6 +10,12 @@ export const useAuthStore = defineStore('auth', () => {
 
     const isAuthenticated = computed(() => !!token.value);
 
+    function syncRealtime() {
+        if (token.value && user.value?.id) {
+            bootRealtime(token.value, user.value.id);
+        }
+    }
+
     async function login(email, password) {
         loading.value = true;
         try {
@@ -16,6 +23,7 @@ export const useAuthStore = defineStore('auth', () => {
             token.value = data.token;
             user.value = data.user;
             localStorage.setItem('auth_token', data.token);
+            syncRealtime();
             return data;
         } finally {
             loading.value = false;
@@ -31,6 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
             token.value = data.token;
             user.value = data.user;
             localStorage.setItem('auth_token', data.token);
+            syncRealtime();
             return data;
         } finally {
             loading.value = false;
@@ -43,6 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
         } catch {
             // ignore logout errors
         }
+        stopRealtime();
         token.value = null;
         user.value = null;
         localStorage.removeItem('auth_token');
@@ -53,8 +63,10 @@ export const useAuthStore = defineStore('auth', () => {
         try {
             const { data } = await api.get('/user');
             user.value = data;
+            syncRealtime();
             return data;
         } catch {
+            stopRealtime();
             token.value = null;
             user.value = null;
             localStorage.removeItem('auth_token');
@@ -62,5 +74,5 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    return { user, token, loading, isAuthenticated, login, register, logout, fetchUser };
+    return { user, token, loading, isAuthenticated, login, register, logout, fetchUser, syncRealtime };
 });

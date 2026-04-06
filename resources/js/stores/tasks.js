@@ -52,8 +52,26 @@ export const useTasksStore = defineStore('tasks', () => {
         fetchTasks(1);
     }
 
+    function applyBroadcastTask(payload) {
+        if (!payload?.id) {
+            return;
+        }
+        const idx = tasks.value.findIndex((t) => t.id === payload.id);
+        if (idx >= 0) {
+            const row = tasks.value[idx];
+            Object.assign(row, {
+                status: payload.status ?? row.status,
+                progress: payload.progress ?? row.progress,
+                result: payload.result ?? row.result,
+                error: payload.error ?? row.error,
+                started_at: payload.started_at ?? row.started_at,
+                completed_at: payload.completed_at ?? row.completed_at,
+            });
+        }
+    }
+
     return {
         tasks, loading, error, pagination, statusFilter, activeTasks,
-        fetchTasks, cancelTask, setFilter,
+        fetchTasks, cancelTask, setFilter, applyBroadcastTask,
     };
 });

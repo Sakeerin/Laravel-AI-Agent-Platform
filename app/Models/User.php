@@ -63,4 +63,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(TaskLog::class);
     }
+
+    public function channelConnections(): HasMany
+    {
+        return $this->hasMany(ChannelConnection::class);
+    }
 }

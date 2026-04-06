@@ -16,4 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
-    })->create();
+    })
+    ->withBroadcasting(
+        channels: __DIR__.'/../routes/channels.php',
+        attributes: ['middleware' => ['auth:sanctum']],
+    )
+    ->create();

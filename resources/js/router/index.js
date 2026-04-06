@@ -32,6 +32,12 @@ const routes = [
         component: () => import('../views/Tasks.vue'),
         meta: { auth: true },
     },
+    {
+        path: '/channels',
+        name: 'channels',
+        component: () => import('../views/Channels.vue'),
+        meta: { auth: true },
+    },
 ];
 
 const router = createRouter({
