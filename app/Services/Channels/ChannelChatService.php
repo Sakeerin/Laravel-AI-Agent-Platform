@@ -2,6 +2,7 @@
 
 namespace App\Services\Channels;
 
+use App\Jobs\ExtractMemoriesFromConversationJob;
 use App\Models\ChannelConnection;
 use App\Models\ChannelThread;
 use App\Models\Conversation;
@@ -44,6 +45,8 @@ class ChannelChatService
             'output_tokens' => $result['output_tokens'],
             'metadata' => ! empty($result['tool_calls']) ? ['tool_calls' => $result['tool_calls']] : null,
         ]);
+
+        ExtractMemoriesFromConversationJob::dispatch($conversation->id);
 
         return $result['content'];
     }

@@ -38,6 +38,12 @@ const routes = [
         component: () => import('../views/Channels.vue'),
         meta: { auth: true },
     },
+    {
+        path: '/personalization',
+        name: 'personalization',
+        component: () => import('../views/Personalization.vue'),
+        meta: { auth: true },
+    },
 ];
 
 const router = createRouter({

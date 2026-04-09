@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ExtractMemoriesFromConversationJob;
 use App\Models\Conversation;
 use App\Services\AI\AgentOrchestrator;
 use App\Services\Tools\ToolContext;
@@ -63,9 +64,10 @@ class ChatController extends Controller
 
     private function resolveConversation($user, array $validated): Conversation
     {
-        if (!empty($validated['conversation_id'])) {
+        if (! empty($validated['conversation_id'])) {
             $conversation = Conversation::findOrFail($validated['conversation_id']);
             abort_if($conversation->user_id !== $user->id, 403);
+
             return $conversation;
         }
 
@@ -86,8 +88,10 @@ class ChatController extends Controller
             'model' => $result['model'] ?? $model,
             'input_tokens' => $result['input_tokens'],
             'output_tokens' => $result['output_tokens'],
-            'metadata' => !empty($result['tool_calls']) ? ['tool_calls' => $result['tool_calls']] : null,
+            'metadata' => ! empty($result['tool_calls']) ? ['tool_calls' => $result['tool_calls']] : null,
         ]);
+
+        ExtractMemoriesFromConversationJob::dispatch($conversation->id);
 
         return response()->json([
             'message' => $assistantMessage,
@@ -147,7 +151,7 @@ class ChatController extends Controller
                     'model' => $model,
                     'input_tokens' => $inputTokens,
                     'output_tokens' => $outputTokens,
-                    'metadata' => !empty($toolCalls) ? ['tool_calls' => $toolCalls] : null,
+                    'metadata' => ! empty($toolCalls) ? ['tool_calls' => $toolCalls] : null,
                 ]);
 
                 $this->sendEvent([
@@ -159,10 +163,12 @@ class ChatController extends Controller
                     'tool_calls_count' => count($toolCalls),
                 ]);
 
+                ExtractMemoriesFromConversationJob::dispatch($conversation->id);
+
             } catch (\Exception $e) {
                 $this->sendEvent([
                     'type' => 'error',
-                    'content' => 'An error occurred: ' . $e->getMessage(),
+                    'content' => 'An error occurred: '.$e->getMessage(),
                 ]);
             }
 
@@ -180,7 +186,7 @@ class ChatController extends Controller
 
     private function sendEvent(array $data): void
     {
-        echo "data: " . json_encode($data) . "\n\n";
+        echo 'data: '.json_encode($data)."\n\n";
         if (ob_get_level() > 0) {
             ob_flush();
         }

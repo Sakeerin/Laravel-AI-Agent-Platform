@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 class OpenAIProvider implements AIProvider
 {
     private string $apiKey;
+
     private string $baseUrl = 'https://api.openai.com/v1';
 
     public function __construct(?string $apiKey = null)
@@ -50,7 +51,7 @@ class OpenAIProvider implements AIProvider
         $inputTokens = 0;
         $outputTokens = 0;
 
-        while (!$body->eof()) {
+        while (! $body->eof()) {
             $chunk = $body->read(1024);
             $buffer .= $chunk;
 
@@ -59,7 +60,7 @@ class OpenAIProvider implements AIProvider
                 $buffer = substr($buffer, $newlinePos + 1);
                 $line = trim($line);
 
-                if (!str_starts_with($line, 'data: ')) {
+                if (! str_starts_with($line, 'data: ')) {
                     continue;
                 }
 
@@ -74,7 +75,7 @@ class OpenAIProvider implements AIProvider
                 }
 
                 $event = json_decode($json, true);
-                if (!$event) {
+                if (! $event) {
                     continue;
                 }
 
@@ -111,6 +112,31 @@ class OpenAIProvider implements AIProvider
     private function resolveModel(string $model): string
     {
         return $this->models()[$model] ?? $model;
+    }
+
+    /**
+     * @return list<float>
+     */
+    public function createEmbedding(string $text, string $model = 'text-embedding-3-small'): array
+    {
+        if ($this->apiKey === '') {
+            throw new \RuntimeException('OpenAI API key not configured.');
+        }
+
+        $response = Http::withToken($this->apiKey)
+            ->timeout(120)
+            ->post("{$this->baseUrl}/embeddings", [
+                'model' => $model,
+                'input' => $text,
+            ]);
+
+        $response->throw();
+        $embedding = $response->json('data.0.embedding');
+        if (! is_array($embedding)) {
+            throw new \RuntimeException('Invalid OpenAI embedding response.');
+        }
+
+        return array_map(static fn ($v) => (float) $v, $embedding);
     }
 
     private function buildPayload(array $messages, string $model, array $options): array

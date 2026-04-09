@@ -89,6 +89,16 @@
         </svg>
         Channels
       </router-link>
+      <router-link
+        to="/personalization"
+        class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition"
+        :class="$route.name === 'personalization' ? 'bg-dark-800 text-white' : 'text-dark-400 hover:bg-dark-800/50 hover:text-dark-200'"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 11.25h7.5m-7.5 3h4.875M12 3c7.18 0 9.75 2.57 9.75 9.75 0 4.125-1.125 6.75-3.375 8.25m-12.75 0c-2.25-1.5-3.375-4.125-3.375-8.25C3 5.57 5.57 3 12 3z" />
+        </svg>
+        Memory
+      </router-link>
     </div>
 
     <!-- User section -->

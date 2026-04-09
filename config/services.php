@@ -48,4 +48,10 @@ return [
         'search_cx' => env('GOOGLE_SEARCH_CX'),
     ],
 
+    'memory' => [
+        'default_embedding_backend' => env('MEMORY_EMBEDDING_BACKEND', 'openai:text-embedding-3-small'),
+        'extraction_model' => env('MEMORY_EXTRACTION_MODEL', 'gpt-4o-mini'),
+        'heartbeat_model' => env('HEARTBEAT_MODEL', 'gpt-4o-mini'),
+    ],
+
 ];

@@ -5,9 +5,11 @@ namespace App\Services\AI;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\ToolCall;
+use App\Services\Memory\MemoryPromptBuilder;
 use App\Services\Tools\ToolContext;
 use App\Services\Tools\ToolExecutor;
 use App\Services\Tools\ToolRegistry;
+use App\Support\AgentSettings;
 
 class AgentOrchestrator
 {
@@ -17,6 +19,7 @@ class AgentOrchestrator
         private readonly AIManager $aiManager,
         private readonly ToolRegistry $toolRegistry,
         private readonly ToolExecutor $toolExecutor,
+        private readonly MemoryPromptBuilder $memoryPromptBuilder,
     ) {}
 
     /**
@@ -79,7 +82,7 @@ class AgentOrchestrator
                     'type' => 'tool_result',
                     'tool_use_id' => $tc['id'],
                     'content' => $execResult['result'],
-                    'is_error' => !$execResult['success'],
+                    'is_error' => ! $execResult['success'],
                 ];
             }
 
@@ -101,8 +104,6 @@ class AgentOrchestrator
     /**
      * Run a streaming chat with tool use support.
      * Yields SSE-formatted events for the client.
-     *
-     * @return \Generator
      */
     public function stream(Conversation $conversation, string $model, ToolContext $context): \Generator
     {
@@ -143,12 +144,13 @@ class AgentOrchestrator
                     'input_tokens' => $totalInputTokens,
                     'output_tokens' => $totalOutputTokens,
                 ];
+
                 return;
             }
 
             // Build assistant content for history
             $assistantContent = [];
-            if (!empty($textContent)) {
+            if (! empty($textContent)) {
                 $assistantContent[] = ['type' => 'text', 'text' => $textContent];
             }
             foreach ($toolCalls as $tc) {
@@ -190,7 +192,7 @@ class AgentOrchestrator
                     'type' => 'tool_result',
                     'tool_use_id' => $tc['id'],
                     'content' => $execResult['result'],
-                    'is_error' => !$execResult['success'],
+                    'is_error' => ! $execResult['success'],
                 ];
             }
 
@@ -209,20 +211,42 @@ class AgentOrchestrator
 
     private function buildHistory(Conversation $conversation): array
     {
-        $messages = $conversation->messages()
+        $conversation->loadMissing('user');
+
+        $settings = AgentSettings::forUser($conversation->user);
+
+        $dbMessages = $conversation->messages()
             ->orderBy('created_at')
-            ->get()
-            ->map(fn(Message $m) => [
-                'role' => $m->role,
-                'content' => $m->content,
-            ])
-            ->toArray();
+            ->get();
+
+        if ($dbMessages->count() > $settings->contextMaxMessages) {
+            $dbMessages = $dbMessages->slice(-$settings->contextMaxMessages)->values();
+        }
+
+        $messages = $dbMessages->map(fn (Message $m) => [
+            'role' => $m->role,
+            'content' => $m->content,
+        ])->toArray();
 
         $toolNames = implode(', ', array_keys($this->toolRegistry->enabled()));
 
+        $basePrompt = "You are a helpful AI assistant with access to tools. You can use tools to search the web, read/write files, run shell commands, browse websites, perform calculations, and check dates/times.\n\nAvailable tools: {$toolNames}\n\nUse tools when they would help answer the user's question. Be concise and accurate in your responses.";
+
+        if ($settings->persona !== null && trim($settings->persona) !== '') {
+            $basePrompt = trim($settings->persona)."\n\n".$basePrompt;
+        }
+
+        $lastUser = $dbMessages->where('role', 'user')->last();
+        if ($lastUser && $conversation->user) {
+            $memoryBlock = $this->memoryPromptBuilder->recallBlock($conversation->user, $lastUser->content);
+            if ($memoryBlock !== '') {
+                $basePrompt .= "\n\n".$memoryBlock;
+            }
+        }
+
         array_unshift($messages, [
             'role' => 'system',
-            'content' => "You are a helpful AI assistant with access to tools. You can use tools to search the web, read/write files, run shell commands, browse websites, perform calculations, and check dates/times.\n\nAvailable tools: {$toolNames}\n\nUse tools when they would help answer the user's question. Be concise and accurate in your responses.",
+            'content' => $basePrompt,
         ]);
 
         return $messages;

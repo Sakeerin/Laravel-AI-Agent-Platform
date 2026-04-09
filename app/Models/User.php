@@ -24,6 +24,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'agent_settings',
     ];
 
     /**
@@ -46,6 +47,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'agent_settings' => 'array',
         ];
     }
 
@@ -67,5 +69,15 @@ class User extends Authenticatable
     public function channelConnections(): HasMany
     {
         return $this->hasMany(ChannelConnection::class);
+    }
+
+    public function memories(): HasMany
+    {
+        return $this->hasMany(UserMemory::class);
+    }
+
+    public function agentReminders(): HasMany
+    {
+        return $this->hasMany(AgentReminder::class);
     }
 }

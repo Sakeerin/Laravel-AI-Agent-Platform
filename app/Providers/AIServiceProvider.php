@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\AI\AgentOrchestrator;
 use App\Services\AI\AIManager;
+use App\Services\Memory\MemoryPromptBuilder;
 use App\Services\Tools\BuiltIn\BrowserTool;
 use App\Services\Tools\BuiltIn\CalculatorTool;
 use App\Services\Tools\BuiltIn\DateTimeTool;
@@ -21,14 +22,14 @@ class AIServiceProvider extends ServiceProvider
         $this->app->singleton(AIManager::class);
 
         $this->app->singleton(ToolRegistry::class, function () {
-            $registry = new ToolRegistry();
+            $registry = new ToolRegistry;
 
-            $registry->register(new WebSearchTool());
-            $registry->register(new BrowserTool());
-            $registry->register(new FileSystemTool());
-            $registry->register(new ShellCommandTool());
-            $registry->register(new CalculatorTool());
-            $registry->register(new DateTimeTool());
+            $registry->register(new WebSearchTool);
+            $registry->register(new BrowserTool);
+            $registry->register(new FileSystemTool);
+            $registry->register(new ShellCommandTool);
+            $registry->register(new CalculatorTool);
+            $registry->register(new DateTimeTool);
 
             return $registry;
         });
@@ -42,6 +43,7 @@ class AIServiceProvider extends ServiceProvider
                 $app->make(AIManager::class),
                 $app->make(ToolRegistry::class),
                 $app->make(ToolExecutor::class),
+                $app->make(MemoryPromptBuilder::class),
             );
         });
     }

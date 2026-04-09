@@ -57,7 +57,7 @@ class OllamaProvider implements AIProvider
         $inputTokens = 0;
         $outputTokens = 0;
 
-        while (!$body->eof()) {
+        while (! $body->eof()) {
             $chunk = $body->read(1024);
             $buffer .= $chunk;
 
@@ -71,11 +71,11 @@ class OllamaProvider implements AIProvider
                 }
 
                 $event = json_decode($line, true);
-                if (!$event) {
+                if (! $event) {
                     continue;
                 }
 
-                if (!($event['done'] ?? false)) {
+                if (! ($event['done'] ?? false)) {
                     yield [
                         'type' => 'text',
                         'content' => $event['message']['content'] ?? '',
@@ -102,6 +102,7 @@ class OllamaProvider implements AIProvider
             foreach ($models as $m) {
                 $result[$m['name']] = $m['name'];
             }
+
             return $result;
         } catch (\Exception) {
             return [];
@@ -111,5 +112,25 @@ class OllamaProvider implements AIProvider
     public function name(): string
     {
         return 'ollama';
+    }
+
+    /**
+     * @return list<float>
+     */
+    public function createEmbedding(string $text, string $model = 'nomic-embed-text'): array
+    {
+        $response = Http::timeout(120)
+            ->post("{$this->host}/api/embeddings", [
+                'model' => $model,
+                'prompt' => $text,
+            ]);
+
+        $response->throw();
+        $embedding = $response->json('embedding');
+        if (! is_array($embedding)) {
+            throw new \RuntimeException('Invalid Ollama embedding response.');
+        }
+
+        return array_map(static fn ($v) => (float) $v, $embedding);
     }
 }
