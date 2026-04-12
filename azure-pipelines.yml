@@ -1,0 +1,45 @@
+# Azure DevOps — PHP + Node build & test (extend with deploy stages as needed)
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  phpVersion: '8.2'
+
+steps:
+  - task: UsePHPVersion@0
+    inputs:
+      versionSpec: $(phpVersion)
+
+  - script: |
+      sudo update-alternatives --set php /usr/bin/php$(phpVersion)
+      php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+      php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    displayName: Install Composer
+
+  - script: composer install --no-interaction --prefer-dist
+    displayName: Composer install
+
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '22.x'
+
+  - script: |
+      npm ci
+      npm run build
+    displayName: npm ci and build
+
+  - script: |
+      cp .env.example .env
+      php artisan key:generate --force
+      touch database/database.sqlite
+      echo "DB_CONNECTION=sqlite" >> .env
+      echo "DB_DATABASE=database/database.sqlite" >> .env
+      php artisan migrate --force
+      php artisan test
+    displayName: PHPUnit

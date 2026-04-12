@@ -50,6 +50,12 @@ const routes = [
         component: () => import('../views/Personalization.vue'),
         meta: { auth: true },
     },
+    {
+        path: '/analytics',
+        name: 'analytics',
+        component: () => import('../views/Analytics.vue'),
+        meta: { auth: true },
+    },
 ];
 
 const router = createRouter({

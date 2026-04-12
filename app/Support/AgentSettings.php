@@ -17,6 +17,7 @@ final class AgentSettings
         public string $embeddingBackend,
         public string $extractionModel,
         public string $heartbeatModel,
+        public bool $onboardingCompleted,
     ) {}
 
     public static function forUser(?User $user): self
@@ -40,6 +41,7 @@ final class AgentSettings
             heartbeatModel: is_string($j['heartbeat_model'] ?? null)
                 ? $j['heartbeat_model']
                 : config('services.memory.heartbeat_model', 'gpt-4o-mini'),
+            onboardingCompleted: (bool) ($j['onboarding_completed'] ?? false),
         );
     }
 
@@ -59,6 +61,7 @@ final class AgentSettings
             'embedding_backend' => $this->embeddingBackend,
             'extraction_model' => $this->extractionModel,
             'heartbeat_model' => $this->heartbeatModel,
+            'onboarding_completed' => $this->onboardingCompleted,
         ];
     }
 
@@ -72,6 +75,7 @@ final class AgentSettings
         $merged = array_merge($current, array_intersect_key($patch, array_flip([
             'persona', 'memory_enabled', 'memory_auto_extract', 'memory_top_k', 'memory_min_score',
             'context_max_messages', 'heartbeat_enabled', 'embedding_backend', 'extraction_model', 'heartbeat_model',
+            'onboarding_completed',
         ])));
 
         return $merged;

@@ -27,6 +27,7 @@ class AgentSettingsController extends Controller
             'embedding_backend' => ['sometimes', 'string', 'max:120'],
             'extraction_model' => ['sometimes', 'string', 'max:100'],
             'heartbeat_model' => ['sometimes', 'string', 'max:100'],
+            'onboarding_completed' => ['sometimes', 'boolean'],
         ]);
 
         $user = $request->user();

@@ -2,14 +2,15 @@
 
 use App\Http\Controllers\Api\AgentReminderController;
 use App\Http\Controllers\Api\AgentSettingsController;
+use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\ApiKeyController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChannelConnectionController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ConversationController;
-use App\Http\Controllers\Api\MemoryController;
 use App\Http\Controllers\Api\CustomSkillController;
 use App\Http\Controllers\Api\MarketplaceController;
+use App\Http\Controllers\Api\MemoryController;
 use App\Http\Controllers\Api\SkillController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\Webhooks\DiscordWebhookController;
@@ -35,7 +36,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 
-    Route::post('/chat', [ChatController::class, 'send']);
+    Route::post('/chat', [ChatController::class, 'send'])->middleware('throttle:api-chat');
     Route::get('/chat/{conversation}/stream', [ChatController::class, 'stream']);
 
     Route::apiResource('conversations', ConversationController::class);
@@ -77,6 +78,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/agent-settings', [AgentSettingsController::class, 'show']);
     Route::patch('/agent-settings', [AgentSettingsController::class, 'update']);
+
+    Route::get('/analytics/summary', [AnalyticsController::class, 'summary']);
+    Route::get('/analytics/timeseries', [AnalyticsController::class, 'timeseries']);
     Route::get('/memories', [MemoryController::class, 'index']);
     Route::post('/memories', [MemoryController::class, 'store']);
     Route::delete('/memories/{user_memory}', [MemoryController::class, 'destroy']);

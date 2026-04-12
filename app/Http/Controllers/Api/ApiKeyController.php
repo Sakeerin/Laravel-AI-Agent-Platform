@@ -30,11 +30,8 @@ class ApiKeyController extends Controller
         $apiKey = $request->user()->apiKeys()->create([
             'provider' => $validated['provider'],
             'name' => $validated['name'],
-            'key_encrypted' => '',
+            'key_encrypted' => $validated['key'],
         ]);
-
-        $apiKey->key = $validated['key'];
-        $apiKey->save();
 
         return response()->json([
             'id' => $apiKey->id,

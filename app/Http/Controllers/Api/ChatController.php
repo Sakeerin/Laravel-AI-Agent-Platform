@@ -6,15 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Jobs\ExtractMemoriesFromConversationJob;
 use App\Models\Conversation;
 use App\Services\AI\AgentOrchestrator;
+use App\Services\Analytics\UsageRecorder;
+use App\Services\Security\PromptInjectionGuard;
 use App\Services\Tools\ToolContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatController extends Controller
 {
     public function __construct(
         private readonly AgentOrchestrator $orchestrator,
+        private readonly PromptInjectionGuard $promptGuard,
+        private readonly UsageRecorder $usageRecorder,
     ) {}
 
     public function send(Request $request): JsonResponse|StreamedResponse
@@ -29,16 +34,24 @@ class ChatController extends Controller
         $user = $request->user();
         $shouldStream = $validated['stream'] ?? true;
 
+        $guard = $this->promptGuard->check($validated['message']);
+        if (! $guard['allowed']) {
+            throw ValidationException::withMessages([
+                'message' => ['This message was blocked for security reasons.'],
+            ]);
+        }
+        $messageText = $guard['content'];
+
         $conversation = $this->resolveConversation($user, $validated);
         $model = $validated['model'] ?? $conversation->model;
 
         $conversation->messages()->create([
             'role' => 'user',
-            'content' => $validated['message'],
+            'content' => $messageText,
         ]);
 
         if ($conversation->messages()->count() === 1) {
-            $conversation->generateTitle($validated['message']);
+            $conversation->generateTitle($messageText);
         }
 
         $conversation->touchActivity();
@@ -92,6 +105,15 @@ class ChatController extends Controller
         ]);
 
         ExtractMemoriesFromConversationJob::dispatch($conversation->id);
+
+        $this->usageRecorder->recordAssistantTurn(
+            $conversation->user,
+            $conversation->id,
+            (string) ($result['model'] ?? $model),
+            (int) ($result['input_tokens'] ?? 0),
+            (int) ($result['output_tokens'] ?? 0),
+            'web',
+        );
 
         return response()->json([
             'message' => $assistantMessage,
@@ -164,6 +186,18 @@ class ChatController extends Controller
                 ]);
 
                 ExtractMemoriesFromConversationJob::dispatch($conversation->id);
+
+                $conversation->loadMissing('user');
+                if ($conversation->user) {
+                    $this->usageRecorder->recordAssistantTurn(
+                        $conversation->user,
+                        $conversation->id,
+                        $model,
+                        $inputTokens,
+                        $outputTokens,
+                        'web',
+                    );
+                }
 
             } catch (\Exception $e) {
                 $this->sendEvent([

@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Crypt;
 
 class ApiKey extends Model
 {
@@ -24,6 +23,7 @@ class ApiKey extends Model
     protected function casts(): array
     {
         return [
+            'key_encrypted' => 'encrypted',
             'is_active' => 'boolean',
             'last_used_at' => 'datetime',
         ];
@@ -32,15 +32,5 @@ class ApiKey extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function setKeyAttribute(string $value): void
-    {
-        $this->attributes['key_encrypted'] = Crypt::encryptString($value);
-    }
-
-    public function getDecryptedKeyAttribute(): string
-    {
-        return Crypt::decryptString($this->key_encrypted);
     }
 }

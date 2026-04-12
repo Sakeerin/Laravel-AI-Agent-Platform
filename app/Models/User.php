@@ -85,4 +85,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(UserSkillInstall::class);
     }
+
+    public function usageEvents(): HasMany
+    {
+        return $this->hasMany(UsageEvent::class);
+    }
 }

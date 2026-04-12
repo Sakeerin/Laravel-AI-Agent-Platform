@@ -8,16 +8,26 @@ use App\Models\ChannelThread;
 use App\Models\Conversation;
 use App\Models\User;
 use App\Services\AI\AgentOrchestrator;
+use App\Services\Analytics\UsageRecorder;
+use App\Services\Security\PromptInjectionGuard;
 use App\Services\Tools\ToolContext;
 
 class ChannelChatService
 {
     public function __construct(
         private readonly AgentOrchestrator $orchestrator,
+        private readonly PromptInjectionGuard $promptGuard,
+        private readonly UsageRecorder $usageRecorder,
     ) {}
 
     public function replyToText(ChannelConnection $connection, string $externalThreadId, string $text): string
     {
+        $guard = $this->promptGuard->check($text);
+        if (! $guard['allowed']) {
+            return 'Sorry, that message could not be processed due to security restrictions.';
+        }
+        $text = $guard['content'];
+
         $user = $connection->user;
         $conversation = $this->resolveConversation($connection, $externalThreadId, $user);
 
@@ -47,6 +57,15 @@ class ChannelChatService
         ]);
 
         ExtractMemoriesFromConversationJob::dispatch($conversation->id);
+
+        $this->usageRecorder->recordAssistantTurn(
+            $user,
+            $conversation->id,
+            (string) ($result['model'] ?? $model),
+            (int) ($result['input_tokens'] ?? 0),
+            (int) ($result['output_tokens'] ?? 0),
+            $connection->provider,
+        );
 
         return $result['content'];
     }
