@@ -55,16 +55,66 @@ class ToolRegistry
     }
 
     /**
-     * Get tool definitions for AI function calling.
+     * Native (PHP-registered) tools that are enabled in DB.
+     *
+     * @return list<array{name: string, description: string, input_schema: array}>
      */
-    public function getToolDefinitions(): array
+    public function getNativeToolDefinitions(): array
     {
         return array_values(
             array_map(
-                fn(BaseTool $tool) => $tool->toToolDefinition(),
+                fn (BaseTool $tool) => $tool->toToolDefinition(),
                 $this->enabled()
             )
         );
+    }
+
+    /**
+     * Dynamic skills (DB-only: HTTP webhooks, etc.) exposed to the model.
+     *
+     * @return list<array{name: string, description: string, input_schema: array}>
+     */
+    public function getDynamicSkillDefinitions(): array
+    {
+        $registered = array_keys($this->tools);
+
+        return Skill::query()
+            ->where('is_enabled', true)
+            ->whereNotIn('name', $registered)
+            ->orderBy('category')
+            ->orderBy('display_name')
+            ->get()
+            ->map(fn (Skill $skill) => $skill->toToolDefinition())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Tool definitions for AI function calling (native + dynamic DB skills).
+     *
+     * @return list<array{name: string, description: string, input_schema: array}>
+     */
+    public function getToolDefinitions(): array
+    {
+        return array_merge(
+            $this->getNativeToolDefinitions(),
+            $this->getDynamicSkillDefinitions()
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function enabledToolNames(): array
+    {
+        $native = array_map(fn (BaseTool $t) => $t->name(), $this->enabled());
+        $dynamic = Skill::query()
+            ->where('is_enabled', true)
+            ->whereNotIn('name', array_keys($this->tools))
+            ->pluck('name')
+            ->all();
+
+        return array_values(array_unique(array_merge($native, $dynamic)));
     }
 
     /**
@@ -83,6 +133,7 @@ class ToolRegistry
                     'is_system' => true,
                     'timeout_seconds' => $tool->timeoutSeconds(),
                     'requires_approval' => $tool->requiresApproval(),
+                    'source' => 'builtin',
                 ]
             );
         }

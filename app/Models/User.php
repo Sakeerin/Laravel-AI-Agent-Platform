@@ -80,4 +80,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(AgentReminder::class);
     }
+
+    public function skillInstalls(): HasMany
+    {
+        return $this->hasMany(UserSkillInstall::class);
+    }
 }

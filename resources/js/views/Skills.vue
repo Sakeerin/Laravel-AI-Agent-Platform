@@ -92,10 +92,22 @@
                   </button>
                 </div>
 
-                <div class="flex items-center gap-3 mt-3 pt-3 border-t border-dark-800/50 text-xs text-dark-500">
+                <div class="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-dark-800/50 text-xs text-dark-500">
                   <span>Timeout: {{ skill.timeout_seconds }}s</span>
                   <span class="w-1 h-1 bg-dark-700 rounded-full"></span>
                   <span>Category: {{ skill.category }}</span>
+                  <span v-if="skill.source" class="w-1 h-1 bg-dark-700 rounded-full"></span>
+                  <span v-if="skill.source">{{ skill.source }}</span>
+                  <template v-if="skill.is_http_webhook && skill.source === 'custom'">
+                    <span class="w-1 h-1 bg-dark-700 rounded-full"></span>
+                    <button
+                      type="button"
+                      class="text-primary-400 hover:text-primary-300"
+                      @click="rollbackSkill(skill)"
+                    >
+                      Rollback
+                    </button>
+                  </template>
                 </div>
               </div>
             </div>
@@ -120,6 +132,7 @@
 <script setup>
 import { reactive, onMounted } from 'vue';
 import { useSkillsStore } from '../stores/skills';
+import api from '../api/client';
 import Sidebar from '../components/Sidebar.vue';
 
 const skills = useSkillsStore();
@@ -139,6 +152,18 @@ function formatCategory(category) {
 
 function getCategoryIcon(category) {
     return 'span';
+}
+
+async function rollbackSkill(skill) {
+    if (!confirm('Restore the previous version of this webhook skill?')) {
+        return;
+    }
+    try {
+        await api.post(`/skills/${skill.id}/rollback`);
+        await skills.fetchSkills();
+    } catch (e) {
+        skills.error = e.response?.data?.message || 'Rollback failed';
+    }
 }
 
 onMounted(() => {

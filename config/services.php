@@ -54,4 +54,10 @@ return [
         'heartbeat_model' => env('HEARTBEAT_MODEL', 'gpt-4o-mini'),
     ],
 
+    'integrations' => [
+        'google_calendar_access_token' => env('GOOGLE_CALENDAR_ACCESS_TOKEN'),
+        'gmail_access_token' => env('GMAIL_ACCESS_TOKEN'),
+        'notion_token' => env('NOTION_INTEGRATION_TOKEN'),
+    ],
+
 ];

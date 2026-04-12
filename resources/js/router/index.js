@@ -27,6 +27,12 @@ const routes = [
         meta: { auth: true },
     },
     {
+        path: '/marketplace',
+        name: 'marketplace',
+        component: () => import('../views/Marketplace.vue'),
+        meta: { auth: true },
+    },
+    {
         path: '/tasks',
         name: 'tasks',
         component: () => import('../views/Tasks.vue'),

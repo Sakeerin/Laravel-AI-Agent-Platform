@@ -2,13 +2,16 @@
 
 namespace App\Services\Tools;
 
+use App\Models\Skill;
 use App\Models\ToolCall;
+use App\Services\Marketplace\HttpWebhookSkillExecutor;
 use Illuminate\Support\Facades\Log;
 
 class ToolExecutor
 {
     public function __construct(
         private readonly ToolRegistry $registry,
+        private readonly HttpWebhookSkillExecutor $httpWebhookSkills,
     ) {}
 
     /**
@@ -20,9 +23,21 @@ class ToolExecutor
         $startTime = microtime(true);
 
         try {
-            $tool = $this->registry->get($toolName);
+            if ($this->registry->has($toolName)) {
+                $tool = $this->registry->get($toolName);
+                $result = $tool->execute($arguments, $context);
+            } else {
+                $skill = Skill::query()
+                    ->where('name', $toolName)
+                    ->where('is_enabled', true)
+                    ->first();
 
-            $result = $tool->execute($arguments, $context);
+                if ($skill && $skill->isHttpWebhook()) {
+                    $result = $this->httpWebhookSkills->execute($skill, $arguments, $context);
+                } else {
+                    throw new \InvalidArgumentException("Tool [{$toolName}] is not registered or enabled.");
+                }
+            }
             $durationMs = (int) ((microtime(true) - $startTime) * 1000);
 
             if ($result['success']) {

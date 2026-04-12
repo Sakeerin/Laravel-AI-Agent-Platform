@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\ChannelConnectionController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MemoryController;
+use App\Http\Controllers\Api\CustomSkillController;
+use App\Http\Controllers\Api\MarketplaceController;
 use App\Http\Controllers\Api\SkillController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\Webhooks\DiscordWebhookController;
@@ -46,8 +48,19 @@ Route::middleware('auth:sanctum')->group(function () {
         return response()->json($ai->availableModels());
     });
 
+    Route::get('/marketplace/manifest-schema', [MarketplaceController::class, 'manifestSchema']);
+    Route::get('/marketplace/packages', [MarketplaceController::class, 'packages']);
+    Route::get('/marketplace/packages/{package}', [MarketplaceController::class, 'show']);
+    Route::post('/marketplace/packages/{package}/install', [MarketplaceController::class, 'install']);
+    Route::delete('/marketplace/packages/{package}/install', [MarketplaceController::class, 'uninstall']);
+    Route::get('/marketplace/my-installs', [MarketplaceController::class, 'myInstalls']);
+
     Route::get('/skills', [SkillController::class, 'index']);
     Route::get('/skills/available', [SkillController::class, 'available']);
+    Route::post('/skills/custom', [CustomSkillController::class, 'store']);
+    Route::patch('/skills/custom/{skill}', [CustomSkillController::class, 'update']);
+    Route::delete('/skills/custom/{skill}', [CustomSkillController::class, 'destroy']);
+    Route::post('/skills/{skill}/rollback', [SkillController::class, 'rollback']);
     Route::get('/skills/{skill}', [SkillController::class, 'show']);
     Route::patch('/skills/{skill}/toggle', [SkillController::class, 'toggle']);
 

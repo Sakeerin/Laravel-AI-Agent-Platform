@@ -228,9 +228,9 @@ class AgentOrchestrator
             'content' => $m->content,
         ])->toArray();
 
-        $toolNames = implode(', ', array_keys($this->toolRegistry->enabled()));
+        $toolNames = implode(', ', $this->toolRegistry->enabledToolNames());
 
-        $basePrompt = "You are a helpful AI assistant with access to tools. You can use tools to search the web, read/write files, run shell commands, browse websites, perform calculations, and check dates/times.\n\nAvailable tools: {$toolNames}\n\nUse tools when they would help answer the user's question. Be concise and accurate in your responses.";
+        $basePrompt = "You are a helpful AI assistant with access to tools (web search, files, shell, browser, calculator, date/time, weather, market data, integrations, and any installed marketplace skills).\n\nAvailable tools: {$toolNames}\n\nUse tools when they would help answer the user's question. Be concise and accurate in your responses.";
 
         if ($settings->persona !== null && trim($settings->persona) !== '') {
             $basePrompt = trim($settings->persona)."\n\n".$basePrompt;
