@@ -1,59 +1,100 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# AI Agent Platform
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 12 + Vue 3 web app for multi-model AI chat, tool execution, channel bots (LINE, Telegram, Slack, Discord), long-term memory, and a skill marketplace—similar in spirit to OpenClaw-style agent platforms.
 
-## About Laravel
+See [implementation_plan.md](implementation_plan.md) for the full phased roadmap (Phases 1–6). Detailed install steps: [SETUP.md](SETUP.md).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Tech stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Layer | Stack |
+| --- | --- |
+| Backend | PHP 8.2+, Laravel 12, Sanctum, Queues, Scheduler |
+| Frontend | Vue 3, Vite, Pinia, Vue Router, Tailwind CSS |
+| AI | Anthropic, OpenAI, Ollama (configurable models) |
+| Realtime | Laravel Echo + Pusher-compatible (e.g. Soketi) |
+| Optional ops | Sentry, Laravel Telescope (dev), Docker Compose |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Features (high level)
 
-## Learning Laravel
+- **Auth:** API token auth via Sanctum; Vue SPA login/register.
+- **Chat:** Streaming (SSE) and non-streaming replies; conversations and messages.
+- **Tools / skills:** Registry with function calling; built-ins (web search, browser, filesystem, shell, weather, stocks, integrations, etc.); marketplace install/custom skills.
+- **Channels:** Webhooks for LINE, Telegram, Slack, Discord with rate limiting.
+- **Memory:** User memories, persona/context settings, optional extraction and heartbeat jobs.
+- **Phase 6 polish:** Prompt-injection guard, encrypted stored API keys, usage/cost analytics, onboarding modal, production Docker files, Azure Pipelines template, k6 smoke script.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Requirements
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- PHP 8.2+
+- Composer
+- Node.js 20+ (or 22+ recommended for parity with CI)
+- MySQL 8 (or SQLite for local/testing)
+- Redis optional (recommended for production queues/cache)
 
-## Laravel Sponsors
+## Local setup
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-### Premium Partners
+Configure `.env` (database, `APP_URL`, AI keys such as `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, optional `OLLAMA_HOST`).
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+php artisan migrate
+npm install
+npm run dev
+```
 
-## Contributing
+In another terminal:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan serve
+```
 
-## Code of Conduct
+For queue and scheduler features (memory extraction, heartbeats, async tasks), run a queue worker and ensure `php artisan schedule:work` or a system cron hits `schedule:run`.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Composer shortcuts:
 
-## Security Vulnerabilities
+- `composer run setup` — install deps, `.env`, key, migrate, npm build
+- `composer run dev` — concurrent server, queue, logs, Vite
+- `composer run test` — clear config cache and PHPUnit
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Production Docker
+
+Build and run the stack (adjust `.env` for `DB_HOST=mysql`, Redis, etc.):
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+The image bundles PHP-FPM + Nginx (see `Dockerfile`, `deploy/`). Run migrations against the DB container on first deploy.
+
+## Testing
+
+```bash
+php artisan test
+```
+
+k6 load smoke (optional): set `BASE_URL` and `SANCTUM_TOKEN`, then run `tests/load/k6-chat-smoke.js`.
+
+## CI
+
+`azure-pipelines.yml` runs Composer, `npm ci` / `npm run build`, migrations on SQLite, and PHPUnit. Extend with your deploy stages and secrets.
+
+## Monitoring & debugging
+
+- **Health:** `GET /up` — use for uptime checks (e.g. Uptime Robot).
+- **Sentry:** set `SENTRY_LARAVEL_DSN` in `.env` when ready.
+- **Telescope:** dev-only package; set `TELESCOPE_ENABLED=true` locally after `composer install` (includes dev dependencies). Disabled by default in config.
+
+## Security notes
+
+- User messages can be filtered for common prompt-injection patterns (`config/security.php`).
+- User API keys in the database use Laravel’s encrypted cast (`APP_KEY` must be stable in production).
+- Review channel webhook secrets, skill HTTP webhook allowlists (`SKILLS_HTTP_WEBHOOK_ALLOWED_HOSTS`), and production `APP_DEBUG=false`.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is open source under the [MIT license](https://opensource.org/licenses/MIT).
