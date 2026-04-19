@@ -2,7 +2,7 @@
 
 Laravel 12 + Vue 3 web app for multi-model AI chat, tool execution, channel bots (LINE, Telegram, Slack, Discord), long-term memory, and a skill marketplace—similar in spirit to OpenClaw-style agent platforms.
 
-See [implementation_plan.md](implementation_plan.md) for the full phased roadmap (Phases 1–6). Detailed install steps: [SETUP.md](SETUP.md).
+See [implementation_plan.md](implementation_plan.md) for the full phased roadmap (Phases 1–6). Detailed install steps: [SETUP.md](SETUP.md). **Thai localhost runbook (step-by-step):** [RUN_LOCALHOST_TH.md](RUN_LOCALHOST_TH.md). Thai environment/config reference: [CONFIGURATION_TH.md](CONFIGURATION_TH.md).
 
 ## Tech stack
 

@@ -5,6 +5,7 @@ namespace App\Services\Tools\BuiltIn;
 use App\Services\Tools\BaseTool;
 use App\Services\Tools\ToolContext;
 use Illuminate\Support\Facades\Http;
+use Symfony\Component\Process\Process;
 
 class BrowserTool extends BaseTool
 {
@@ -117,11 +118,73 @@ class BrowserTool extends BaseTool
 
     private function takeScreenshot(string $url, ?ToolContext $context): array
     {
-        return [
-            'success' => false,
-            'result' => null,
-            'error' => 'Screenshot functionality requires Playwright. Use the fetch action to get page content instead.',
-        ];
+        if (! config('services.browser.playwright_enabled')) {
+            return [
+                'success' => false,
+                'result' => null,
+                'error' => 'Screenshots are disabled. Set BROWSER_PLAYWRIGHT_ENABLED=true, install Node on the server, run `npx playwright install chromium`, then retry. Or use action=fetch to read page text.',
+            ];
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'pwshot');
+        if ($tmp === false) {
+            return ['success' => false, 'result' => null, 'error' => 'Could not create temp file for screenshot'];
+        }
+
+        $pngPath = $tmp.'.png';
+        @unlink($tmp);
+
+        $timeout = (int) config('services.browser.playwright_timeout', 45);
+        $viewport = (string) config('services.browser.viewport', '1280,720');
+        $npx = (string) config('services.browser.npx_binary', 'npx');
+
+        $command = [$npx, '--yes', 'playwright', 'screenshot', $url, $pngPath, '--viewport-size='.$viewport];
+
+        try {
+            $process = new Process($command);
+            $process->setTimeout($timeout);
+            $process->run();
+
+            if (! $process->isSuccessful() || ! is_readable($pngPath)) {
+                @unlink($pngPath);
+
+                return [
+                    'success' => false,
+                    'result' => null,
+                    'error' => 'Playwright screenshot failed: '.trim($process->getErrorOutput() ?: $process->getOutput() ?: 'unknown error'),
+                ];
+            }
+
+            $raw = file_get_contents($pngPath);
+            @unlink($pngPath);
+
+            if ($raw === false) {
+                return ['success' => false, 'result' => null, 'error' => 'Could not read screenshot file'];
+            }
+
+            $maxBytes = 1_800_000;
+            if (strlen($raw) > $maxBytes) {
+                return [
+                    'success' => false,
+                    'result' => null,
+                    'error' => 'Screenshot exceeds maximum size ('.$maxBytes.' bytes). Try a simpler page or increase limit in BrowserTool.',
+                ];
+            }
+
+            return [
+                'success' => true,
+                'result' => [
+                    'url' => $url,
+                    'format' => 'png',
+                    'image_base64' => base64_encode($raw),
+                    'bytes' => strlen($raw),
+                ],
+            ];
+        } catch (\Exception $e) {
+            @unlink($pngPath);
+
+            return ['success' => false, 'result' => null, 'error' => 'Playwright screenshot error: '.$e->getMessage()];
+        }
     }
 
     private function htmlToText(string $html, ?string $selector): string

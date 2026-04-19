@@ -60,4 +60,16 @@ return [
         'notion_token' => env('NOTION_INTEGRATION_TOKEN'),
     ],
 
+    /*
+    | Optional headless screenshots via Playwright CLI (npx). Requires Node on
+    | the app host and: npx playwright install chromium
+    */
+    'browser' => [
+        'playwright_enabled' => env('BROWSER_PLAYWRIGHT_ENABLED', false),
+        'playwright_timeout' => (int) env('BROWSER_PLAYWRIGHT_TIMEOUT', 45),
+        'viewport' => env('BROWSER_PLAYWRIGHT_VIEWPORT', '1280,720'),
+        // Override full argv prefix after npx, e.g. ["playwright", "screenshot"] if using a global install
+        'npx_binary' => env('BROWSER_NPX_BINARY', 'npx'),
+    ],
+
 ];
