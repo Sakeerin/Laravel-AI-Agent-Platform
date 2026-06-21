@@ -10,7 +10,7 @@ class OllamaProvider implements AIProvider
 
     public function __construct(?string $host = null)
     {
-        $this->host = rtrim($host ?? config('services.ollama.host', 'http://localhost:11434'), '/');
+        $this->host = rtrim((string) ($host ?? config('services.ollama.host', 'http://localhost:11434')), '/');
     }
 
     public function chat(array $messages, string $model, array $options = []): array

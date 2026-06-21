@@ -12,7 +12,7 @@ class OpenAIProvider implements AIProvider
 
     public function __construct(?string $apiKey = null)
     {
-        $this->apiKey = $apiKey ?? config('services.openai.api_key', '');
+        $this->apiKey = (string) ($apiKey ?? config('services.openai.api_key', ''));
     }
 
     public function chat(array $messages, string $model, array $options = []): array

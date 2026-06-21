@@ -30,6 +30,8 @@ class ShellCommandTool extends BaseTool
         '/>\s*\/etc\//',  // writing to /etc
         '/>\s*\/usr\//',
         '/>\s*\/bin\//',
+        '/(^|\s)(\/etc|\/usr|\/bin|\/sbin|\/var|\/root|[A-Za-z]:[\/\\\\])/',
+        '/(^|\s|[\/\\\\])\.\.([\/\\\\]|\s|$)/',
     ];
 
     public function name(): string
@@ -98,12 +100,27 @@ class ShellCommandTool extends BaseTool
             return ['success' => false, 'result' => null, 'error' => $securityCheck];
         }
 
-        $cwd = $context->getSandboxPath();
+        $sandbox = realpath($context->getSandboxPath());
+        if ($sandbox === false) {
+            return ['success' => false, 'result' => null, 'error' => 'Sandbox path is not available'];
+        }
+
+        $cwd = $sandbox;
         if (!empty($workDir)) {
+            if ($this->containsPathTraversal($workDir)) {
+                return ['success' => false, 'result' => null, 'error' => 'Working directory cannot contain path traversal'];
+            }
+
             $cwd .= DIRECTORY_SEPARATOR . ltrim($workDir, '/\\');
             if (!is_dir($cwd)) {
                 mkdir($cwd, 0755, true);
             }
+
+            $resolvedCwd = realpath($cwd);
+            if ($resolvedCwd === false || ! $this->isPathInside($resolvedCwd, $sandbox)) {
+                return ['success' => false, 'result' => null, 'error' => 'Working directory must stay inside the sandbox'];
+            }
+            $cwd = $resolvedCwd;
         }
 
         try {
@@ -156,5 +173,20 @@ class ShellCommandTool extends BaseTool
         }
 
         return null;
+    }
+
+    private function containsPathTraversal(string $path): bool
+    {
+        $segments = preg_split('/[\/\\\\]+/', $path) ?: [];
+
+        return in_array('..', $segments, true);
+    }
+
+    private function isPathInside(string $path, string $base): bool
+    {
+        $path = rtrim(str_replace('\\', '/', $path), '/');
+        $base = rtrim(str_replace('\\', '/', $base), '/');
+
+        return $path === $base || str_starts_with($path, $base.'/');
     }
 }

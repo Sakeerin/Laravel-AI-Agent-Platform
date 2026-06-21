@@ -32,6 +32,12 @@ class CustomSkillController extends Controller
             ], 422);
         }
 
+        if (Skill::query()->where('name', $manifest['name'])->exists()) {
+            return response()->json([
+                'message' => 'A skill with this manifest.name already exists. Use a unique name.',
+            ], 422);
+        }
+
         $exec = $manifest['execution'];
         $skill = DB::transaction(function () use ($manifest, $exec) {
             $skill = Skill::query()->create([
@@ -145,7 +151,7 @@ class CustomSkillController extends Controller
     /**
      * @return array<string, mixed>|JsonResponse
      */
-    private function resolveManifestInput(Request $request): array|JsonResponse
+    private function resolveManifestInput(Request $request)
     {
         $request->validate([
             'manifest' => ['required_without:manifest_yaml', 'array'],
